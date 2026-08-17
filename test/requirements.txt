@@ -1,0 +1,3 @@
+pytest>=8.0
+# optional: run the suite in parallel with `pytest -n auto`
+pytest-xdist>=3.5

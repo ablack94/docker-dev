@@ -2,3 +2,5 @@
 .github
 .claude-container
 .claude
+test
+pytest.ini

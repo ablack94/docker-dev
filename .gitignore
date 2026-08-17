@@ -1,2 +1,5 @@
 .claude-container
 .claude
+__pycache__/
+.pytest_cache/
+.venv/

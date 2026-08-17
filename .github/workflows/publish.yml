@@ -22,7 +22,31 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # Resolved once so the test build and the published build agree.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      claude: ${{ steps.claude_version.outputs.version }}
+    steps:
+      - name: Determine Claude version
+        id: claude_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.claude_version }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=stable" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    needs: version
+    uses: ./.github/workflows/test.yml
+    with:
+      claude_version: ${{ needs.version.outputs.claude }}
+
   build-and-push:
+    needs: [version, test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -53,17 +77,6 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=${{ inputs.image_tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
-      - name: Determine Claude version
-        id: claude_version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.claude_version }}" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=stable" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Build and push
         id: push
         uses: docker/build-push-action@v6
@@ -73,7 +86,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            CLAUDE_VERSION=${{ steps.claude_version.outputs.version }}
+            CLAUDE_VERSION=${{ needs.version.outputs.claude }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

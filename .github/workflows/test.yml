@@ -1,0 +1,55 @@
+name: Test
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      claude_version:
+        description: "Claude version to build against"
+        required: false
+        default: "stable"
+        type: string
+  # Called as a gate by publish.yml before anything is pushed to GHCR.
+  workflow_call:
+    inputs:
+      claude_version:
+        required: false
+        default: "stable"
+        type: string
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  # Supersede stale PR runs, but never cancel a run that gates a publish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install -r test/requirements.txt
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: docker-dev:test
+          build-args: |
+            CLAUDE_VERSION=${{ inputs.claude_version || 'stable' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run test suite
+        run: pytest --image docker-dev:test
