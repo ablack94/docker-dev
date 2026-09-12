@@ -52,10 +52,10 @@ RUN apt-get update -y \
 # owned by the runtime user, so user-writable toolchains (rustup, uv-managed
 # pythons, nvm) are installed as this user rather than chown'd after the fact
 # (a recursive chown/chmod in a later layer duplicates the ~GB toolchain tree).
-# ubuntu:24.04 ships an `ubuntu` user occupying uid/gid 1000; reclaim it.
-RUN userdel -r ubuntu 2>/dev/null; groupdel ubuntu 2>/dev/null; \
-    groupadd --gid 1000 claude \
- && useradd --uid 1000 --gid claude --create-home --shell /bin/bash claude
+# ubuntu:24.04 ships an `ubuntu` user occupying uid/gid 1000; rename it rather
+# than delete/recreate (keeps uid 1000 owned throughout, fails loudly on error).
+RUN usermod -l claude -d /home/claude -m ubuntu \
+ && groupmod -n claude ubuntu
 
 #
 # Static binaries
